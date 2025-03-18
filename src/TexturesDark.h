@@ -48,11 +48,37 @@ void main() {
 
 inline static const std::string DARK_MODE_FUNC = R"glsl(
 void invert(inout vec4 color) {
-    // Invert Colors
-    color.rgb = vec3(1.) - vec3(.88, .9, .92) * color.rgb;
+    // true chroma key shader
+    // from https://www.shadertoy.com/view/XsjyDy
 
-    // Invert Hue
-    color.rgb = dot(vec3(0.26312, 0.5283, 0.10488), color.rgb) * 2.0 - color.rgb;
+    vec3 chroma = vec3(0,1,0);
+
+    float level = 0.5;
+    float threshold = 0.35;
+
+    // normalize colors
+    // normLength is used to filter false color matches
+    float normLength = clamp(length(color.rgb) / length(chroma.rgb), 0.0, 1.0);
+    vec3 normColor = normalize(color.rgb) * normLength;
+    vec3 normKey = normalize(chroma.rgb);
+
+    // Calculate difference from KEY_COLOR
+    float colorDiff = length(normColor - normKey);
+
+    if (color.rgb == vec3(0,0,0)) {
+        // fix pure black hack
+        colorDiff = 1.;
+    } else {
+        // remove green edge glow
+        colorDiff = smoothstep(level - threshold, level + threshold, colorDiff);
+        color.g = color.g - (chroma.g * (1.0 - colorDiff));
+    }
+
+    // NOTE!
+    // In reality, filtered image should not be mixed, but rendered in a seperate pass
+    // This will also enable removal of dark alpha edges (maybe that is the buffer functionality)
+
+    color.a = colorDiff;
 }
 )glsl";
 
